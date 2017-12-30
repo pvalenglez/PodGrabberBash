@@ -97,23 +97,17 @@ while read line; do
 
             # If a file with the exact same filename exists, it means I've already downloaded it
             # If not then let's download it
-			if [ -f "$chapter_title.mp3" ]; then
+			if [ -f "$chapter_title.ogg" ]; then
 				echo "Skipping existing file.."
 			else
-				#wget -c $chapter_url -O "$chapter_title.mp3"
-                echo "$chapter_title.mp3"
-                : '
+				wget -c $chapter_url -O "$chapter_title.mp3"
+                #echo "$chapter_title.mp3"
 				filename=$chapter_title.mp3
-
-				if ffprobe "$filename" 2>&1 | grep stereo; then
-					ffmpeg -i "$filename" -codec:a libmp3lame -q:a 9 -ac 1 "${filename/$DOT_MP3}_conv.mp3" -nostdin
-					if [ $? -eq 0 ]; then
-						touch -r "$filename" "${filename/$DOT_MP3}_conv.mp3"
-						rm -f "$filename";
-						mv "${filename/$DOT_MP3}_conv.mp3" "$filename"
-					fi
+				ffmpeg -i "$filename" -q:a 0 -ac 1 "${filename/$DOT_MP3}.ogg" -nostdin
+				if [ $? -eq 0 ]; then
+					touch -r "$filename" "${filename/$DOT_MP3}.ogg"
+					rm -f "$filename";
 				fi
-                '
 			fi
 	    fi
 
