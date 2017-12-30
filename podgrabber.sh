@@ -16,6 +16,7 @@ QUESTION_MARK_2="¿"
 ASTERISK="\*"
 DOT_MP3=".mp3"
 KEYWORD_MIN_SIZE=3
+SCRIPT_DIR=$(readlink -f ${0%/*})
 
 # Create the podcasts folder in case it doesn't exist and cd to it
 mkdir -pv podcasts
@@ -88,7 +89,6 @@ while read line; do
             chapter_title=${chapter_title//","}
             chapter_title=${chapter_title//".."}
             chapter_title=${chapter_title//"_"/"."}
-			echo "Título del capítulo:" $chapter_title
 
 		elif [[ "$line" == *"/rss/channel/item/enclosure/@url"* ]]; then
 
@@ -125,4 +125,4 @@ while read line; do
 
 	cd ..
 
-done < /media/NASDRIVE/podgrab/input_podcasts.txt
+done < $SCRIPT_DIR/input_podcasts.txt
