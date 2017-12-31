@@ -18,6 +18,58 @@ DOT_MP3=".mp3"
 KEYWORD_MIN_SIZE=3
 SCRIPT_DIR=$(readlink -f ${0%/*})
 
+# Keeps track of the text that is going to be sent as a notification
+notification_body=""
+
+#######################################
+# Removes bullshit from chapter filenames
+# Arguments:
+#   $1 -> Chapter filename
+#   $2 -> Keywords to remove
+# Returns:
+#   None
+#######################################
+sanitize_filename () {
+    title=$1
+    keywords=$2
+    # Remove all podcast keywords that are longer than three characteres from
+    # the chapter filename
+    for keyword in ${keywords[@]}; do
+        if [[ ${#keyword} -gt $KEYWORD_MIN_SIZE ]]; then
+            title=${title//$keyword}
+        fi
+    done
+
+    # Sanitize chapter filename to avoid trouble copying or saving it
+	title=${title//"/"/" "}
+	title=${title//"-"/" "}
+    title=${title//"..."}
+    title=${title//"."}
+    title=${title//"("}
+    title=${title//")"}
+    title=${title//$LESS_THAN/" "}
+    title=${title//$GREATER_THAN/" "}
+    title=${title//$COLON/" "}
+    title=${title//$DOUBLE_QUOTE/" "}
+    title=${title//$FORWARD_SLASH/" "}
+    title=${title//$BACKSLASH/" "}
+    title=${title//$PIPE/" "}
+    title=${title//$QUESTION_MARK/" "}
+    title=${title//$QUESTION_MARK_2/" "}
+    title=${title//$ASTERISK/" "}
+    title=${title//"&quot"}
+    title=${title//";"}
+    title=${title//"'"}
+    title=${title//"#"}
+    title=${title//"—"}
+    title=${title//"–"}
+    title=$(echo $title | xargs -0)
+    title=${title//" "/"."}
+    title=${title//","}
+    title=${title//".."}
+    title=${title//"_"/"."}
+}
+
 # Create the podcasts folder in case it doesn't exist and cd to it
 mkdir -pv podcasts
 cd podcasts
@@ -34,7 +86,7 @@ while read line; do
 	title=$(wget -qO- $line | perl -l -0777 -ne 'print $1 if /<title.*?>\s*(.*?)\s*<\/title/si')
 	title=$(echo ${title/$CDATA_BEGIN})
 	title=$(echo ${title/$CDATA_END})
-	echo "Obtaining new episodes from podcast:\""$title"\""
+	notification_body="$notification_body\nObtaining new episodes from podcast:\""$title"\"\n"
 
     # Initialize list of keywords that are to be removed form chapter names
     podcast_keywords=($(echo "$title" | tr ',' '\n'))
@@ -45,50 +97,17 @@ while read line; do
 
     # Control variable in case of a new podcast to download a maximum number of 50 chapters
 	chapter_counter=0
-    # TODO fail if xml2 is not installed
-	curl -s $line | xml2 | grep /rss/channel/item | while read line ; do
+
+    # Fail if xml2 is not installed
+    command -v xml2 >/dev/null 2>&1 || { echo >&2 "I require xml2 but it's not installed.  Aborting."; exit 1; }
+
+	while read line ; do
 
         # If I've found a chapter title line then initialize it
 		if [[ "$line" == *"/rss/channel/item/title"* ]]; then
 
 			chapter_title=$(echo $line | cut -d "=" -f 2)
-
-            # Remove all podcast keywords that are longer than three characteres from
-            # the chapter filename
-            for keyword in ${podcast_keywords[@]}; do
-                if [[ ${#keyword} -gt $KEYWORD_MIN_SIZE ]]; then
-                    chapter_title=${chapter_title//$keyword}
-                fi
-            done
-
-            # Sanitize chapter filename to avoid trouble copying or saving it
-			chapter_title=${chapter_title//"/"/" "}
-			chapter_title=${chapter_title//"-"/" "}
-            chapter_title=${chapter_title//"..."}
-            chapter_title=${chapter_title//"."}
-            chapter_title=${chapter_title//"("}
-            chapter_title=${chapter_title//")"}
-            chapter_title=${chapter_title//$LESS_THAN/" "}
-            chapter_title=${chapter_title//$GREATER_THAN/" "}
-            chapter_title=${chapter_title//$COLON/" "}
-            chapter_title=${chapter_title//$DOUBLE_QUOTE/" "}
-            chapter_title=${chapter_title//$FORWARD_SLASH/" "}
-            chapter_title=${chapter_title//$BACKSLASH/" "}
-            chapter_title=${chapter_title//$PIPE/" "}
-            chapter_title=${chapter_title//$QUESTION_MARK/" "}
-            chapter_title=${chapter_title//$QUESTION_MARK_2/" "}
-            chapter_title=${chapter_title//$ASTERISK/" "}
-            chapter_title=${chapter_title//"&quot"}
-            chapter_title=${chapter_title//";"}
-            chapter_title=${chapter_title//"'"}
-            chapter_title=${chapter_title//"#"}
-            chapter_title=${chapter_title//"—"}
-            chapter_title=${chapter_title//"–"}
-            chapter_title=$(echo $chapter_title | xargs -0)
-            chapter_title=${chapter_title//" "/"."}
-            chapter_title=${chapter_title//","}
-            chapter_title=${chapter_title//".."}
-            chapter_title=${chapter_title//"_"/"."}
+            sanitize_filename $chapter_title $podcast_keywords
 
 		elif [[ "$line" == *"/rss/channel/item/enclosure/@url"* ]]; then
 
@@ -100,14 +119,15 @@ while read line; do
 			if [ -f "$chapter_title.ogg" ]; then
 				echo "Skipping existing file.."
 			else
-				wget -c $chapter_url -O "$chapter_title.mp3"
-                #echo "$chapter_title.mp3"
-				filename=$chapter_title.mp3
-				ffmpeg -i "$filename" -q:a 0 -ac 1 "${filename/$DOT_MP3}.ogg" -nostdin
-				if [ $? -eq 0 ]; then
-					touch -r "$filename" "${filename/$DOT_MP3}.ogg"
-					rm -f "$filename";
-				fi
+				#wget -c $chapter_url -O "$chapter_title.mp3"
+                notification_body="$notification_body\n$chapter_title.mp3"
+
+				#filename=$chapter_title.mp3
+				#ffmpeg -i "$filename" -q:a 0 -ac 1 "${filename/$DOT_MP3}.ogg" -nostdin
+				#if [ $? -eq 0 ]; then
+				#	touch -r "$filename" "${filename/$DOT_MP3}.ogg"
+				#	rm -f "$filename";
+				#fi
 			fi
 	    fi
 
@@ -115,8 +135,12 @@ while read line; do
 		if [[ "$chapter_counter" -gt $LIMIT_CHAPTERS ]]; then
 			break;
 		fi
-	done
+    done <<< $(curl -s $line | xml2 | grep /rss/channel/item)
 
+    notification_body="$notification_body\n\n"
 	cd ..
 
 done < $SCRIPT_DIR/input_podcasts.txt
+
+current_date=$(date +'%d/%m/%Y')
+printf "$notification_body" | mail -v -s "PodGrabber execution ($current_date)"  valeng.pablo@gmail.com
