@@ -119,15 +119,15 @@ while read line; do
 			if [ -f "$chapter_title.ogg" ]; then
 				echo "Skipping existing file.."
 			else
-				#wget -c $chapter_url -O "$chapter_title.mp3"
+				wget -c $chapter_url -O "$chapter_title.mp3"
                 notification_body="$notification_body\n$chapter_title.mp3"
 
-				#filename=$chapter_title.mp3
-				#ffmpeg -i "$filename" -q:a 0 -ac 1 "${filename/$DOT_MP3}.ogg" -nostdin
-				#if [ $? -eq 0 ]; then
-				#	touch -r "$filename" "${filename/$DOT_MP3}.ogg"
-				#	rm -f "$filename";
-				#fi
+				filename=$chapter_title.mp3
+				ffmpeg -i "$filename" -q:a 0 -ac 1 "${filename/$DOT_MP3}.ogg" -nostdin
+				if [ $? -eq 0 ]; then
+					touch -r "$filename" "${filename/$DOT_MP3}.ogg"
+				    rm -f "$filename";
+				fi
 			fi
 	    fi
 
