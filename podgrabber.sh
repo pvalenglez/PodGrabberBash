@@ -68,6 +68,7 @@ sanitize_filename () {
     title=${title//","}
     title=${title//".."}
     title=${title//"_"/"."}
+    printf "%s\n" "$title"
 }
 
 # Create the podcasts folder in case it doesn't exist and cd to it
@@ -107,7 +108,7 @@ while read line; do
 		if [[ "$line" == *"/rss/channel/item/title"* ]]; then
 
 			chapter_title=$(echo $line | cut -d "=" -f 2)
-            sanitize_filename $chapter_title $podcast_keywords
+            chapter_title=$(sanitize_filename "$chapter_title" $podcast_keywords)
 
 		elif [[ "$line" == *"/rss/channel/item/enclosure/@url"* ]]; then
 
@@ -119,7 +120,7 @@ while read line; do
 			if [ -f "$chapter_title.ogg" ]; then
 				echo "Skipping existing file.."
 			else
-				wget -c $chapter_url -O "$chapter_title.mp3"
+			    wget -c $chapter_url -O "$chapter_title.mp3"
                 notification_body="$notification_body\n$chapter_title.mp3"
 
 				filename=$chapter_title.mp3
@@ -135,7 +136,7 @@ while read line; do
 		if [[ "$chapter_counter" -gt $LIMIT_CHAPTERS ]]; then
 			break;
 		fi
-    done <<< $(curl -s $line | xml2 | grep /rss/channel/item)
+    done < <(curl -s $line | xml2 | grep /rss/channel/item)
 
     notification_body="$notification_body\n\n"
 	cd ..
